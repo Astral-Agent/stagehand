@@ -26,6 +26,21 @@ export interface ConstructorParams {
    * Instructions for stagehand.
    */
   systemPrompt?: string;
+  /**
+   * Configuration for the browser instance
+   */
+  browserConfig?: {
+    /**
+     * Path to the Chrome/Chromium executable
+     * @example "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary"
+     */
+    executablePath?: string;
+    /**
+     * Path to the user data directory containing browser profiles
+     * @example "~/Library/Application Support/Google/Chrome Canary"
+     */
+    userDataDir?: string;
+  };
 }
 
 export interface InitOptions {

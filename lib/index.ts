@@ -29,6 +29,8 @@ import { LLMProvider } from "./llm/LLMProvider";
 import { logLineToString } from "./utils";
 import { StagehandPage } from "./StagehandPage";
 import { StagehandContext } from "./StagehandContext";
+import { AvailableModel, ClientOptions } from "../types/model";
+import { CreateChatCompletionOptions, LLMResponse } from "./llm/LLMClient";
 
 dotenv.config({ path: ".env" });
 
@@ -48,6 +50,7 @@ async function getBrowser(
   logger: (message: LogLine) => void,
   browserbaseSessionCreateParams?: Browserbase.Sessions.SessionCreateParams,
   browserbaseSessionID?: string,
+  browserConfig?: ConstructorParams["browserConfig"],
 ): Promise<BrowserResult> {
   if (env === "BROWSERBASE") {
     if (!apiKey) {
@@ -216,6 +219,13 @@ async function getBrowser(
     const tmpDir = fs.mkdtempSync(path.join(tmpDirPath, "ctx_"));
     fs.mkdirSync(path.join(tmpDir, "userdir/Default"), { recursive: true });
 
+    const defaultCanaryProfile =
+      browserConfig?.userDataDir ||
+      path.join(
+        os.homedir(),
+        "Library/Application Support/Google/Chrome Canary",
+      );
+
     const defaultPreferences = {
       plugins: {
         always_open_pdf_externally: true,
@@ -230,11 +240,33 @@ async function getBrowser(
     const downloadsPath = path.join(process.cwd(), "downloads");
     fs.mkdirSync(downloadsPath, { recursive: true });
 
+    const canaryPath =
+      browserConfig?.executablePath ||
+      path.join(
+        "/Applications",
+        "Google Chrome Canary.app",
+        "Contents",
+        "MacOS",
+        "Google Chrome Canary",
+      );
+
+    const launchOptions = {
+      executablePath: canaryPath,
+      headless: headless,
+      args: [
+        "--enable-webgl",
+        "--use-gl=swiftshader",
+        "--enable-accelerated-2d-canvas",
+        "--disable-blink-features=AutomationControlled",
+        "--disable-web-security",
+      ],
+    };
+
     const context = await chromium.launchPersistentContext(
-      path.join(tmpDir, "userdir"),
+      defaultCanaryProfile,
       {
+        ...launchOptions,
         acceptDownloads: true,
-        headless: headless,
         viewport: {
           width: 1250,
           height: 800,
@@ -242,13 +274,6 @@ async function getBrowser(
         locale: "en-US",
         timezoneId: "America/New_York",
         deviceScaleFactor: 1,
-        args: [
-          "--enable-webgl",
-          "--use-gl=swiftshader",
-          "--enable-accelerated-2d-canvas",
-          "--disable-blink-features=AutomationControlled",
-          "--disable-web-security",
-        ],
         bypassCSP: true,
       },
     );
@@ -327,6 +352,7 @@ export class Stagehand {
   private contextPath?: string;
   private llmClient: LLMClient;
   private userProvidedInstructions?: string;
+  private browserConfig?: ConstructorParams["browserConfig"];
 
   constructor(
     {
@@ -346,6 +372,7 @@ export class Stagehand {
       modelName,
       modelClientOptions,
       systemPrompt,
+      browserConfig,
     }: ConstructorParams = {
       env: "BROWSERBASE",
     },
@@ -361,17 +388,56 @@ export class Stagehand {
     this.projectId = projectId ?? process.env.BROWSERBASE_PROJECT_ID;
     this.verbose = verbose ?? 0;
     this.debugDom = debugDom ?? false;
+
+    // Ensure llmClient is always defined
     if (llmClient) {
       this.llmClient = llmClient;
     } else {
+      // try to set a default LLM client
       try {
-        // try to set a default LLM client
         this.llmClient = this.llmProvider.getClient(
           modelName ?? DEFAULT_MODEL_NAME,
           modelClientOptions,
         );
-      } catch {
-        this.llmClient = undefined;
+      } catch (error) {
+        console.warn("Failed to initialize default LLM client:", error);
+        // Create a dummy LLM client that does nothing
+        this.llmClient = new (class extends LLMClient {
+          constructor() {
+            super("gpt-4o" as AvailableModel);
+            this.type = "dummy";
+            this.hasVision = false;
+            this.clientOptions = {} as ClientOptions;
+          }
+
+          async createChatCompletion<T = LLMResponse>(
+            _options: CreateChatCompletionOptions,
+          ): Promise<T> {
+            const dummyResponse: LLMResponse = {
+              id: "dummy-id",
+              object: "chat.completion",
+              created: Date.now(),
+              model: "dummy",
+              choices: [
+                {
+                  index: 0,
+                  message: {
+                    role: "assistant",
+                    content: "",
+                    tool_calls: [],
+                  },
+                  finish_reason: "stop",
+                },
+              ],
+              usage: {
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                total_tokens: 0,
+              },
+            };
+            return dummyResponse as T;
+          }
+        })();
       }
     }
 
@@ -380,6 +446,7 @@ export class Stagehand {
     this.browserbaseSessionCreateParams = browserbaseSessionCreateParams;
     this.browserbaseSessionID = browserbaseSessionID;
     this.userProvidedInstructions = systemPrompt;
+    this.browserConfig = browserConfig;
   }
 
   public get logger(): (logLine: LogLine) => void {
@@ -433,21 +500,18 @@ export class Stagehand {
         this.logger,
         this.browserbaseSessionCreateParams,
         this.browserbaseSessionID,
-      ).catch((e) => {
-        console.error("Error in init:", e);
-        const br: BrowserResult = {
-          context: undefined,
-          debugUrl: undefined,
-          sessionUrl: undefined,
-          sessionId: undefined,
-          env: this.env,
-        };
-        return br;
-      });
+        this.browserConfig,
+      );
     this.intEnv = env;
     this.contextPath = contextPath;
     this.stagehandContext = await StagehandContext.init(context, this);
-    const defaultPage = this.context.pages()[0];
+
+    // Ensure we have a page
+    let defaultPage = this.context.pages()[0];
+    if (!defaultPage) {
+      defaultPage = await this.context.newPage();
+    }
+
     this.stagehandPage = await new StagehandPage(
       defaultPage,
       this,

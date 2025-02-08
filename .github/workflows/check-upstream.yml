@@ -1,0 +1,60 @@
+name: Check Upstream Updates
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Run daily at midnight
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git remote add upstream https://github.com/browserbase/stagehand.git
+          git fetch upstream
+
+      - name: Check for updates
+        id: check
+        run: |
+          UPSTREAM_COMMITS=$(git rev-list --count HEAD..upstream/main)
+          echo "updates_available=$UPSTREAM_COMMITS" >> $GITHUB_OUTPUT
+          if [ "$UPSTREAM_COMMITS" -gt "0" ]; then
+            COMMIT_LIST=$(git log --pretty=format:"- %s (%h)" HEAD..upstream/main)
+            echo "commit_list<<EOF" >> $GITHUB_OUTPUT
+            echo "$COMMIT_LIST" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Issue
+        if: steps.check.outputs.updates_available != '0'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const commits = `${{ steps.check.outputs.commit_list }}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🔄 New updates available from upstream',
+              body: `There are new updates available from the upstream Stagehand repository.
+
+            **New commits:**
+            ${commits}
+
+            To update:
+            \`\`\`bash
+            git checkout main
+            git fetch upstream
+            git merge upstream/main
+            git push origin main
+            git checkout extended-main
+            git rebase main
+            git push -f origin extended-main
+            \`\`\`
+            `
+            });

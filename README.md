@@ -1,3 +1,115 @@
+# Stagehand Extended
+
+A fork of [Browserbase's Stagehand](https://github.com/browserbase/stagehand) with enhanced browser configuration capabilities.
+
+## Why This Fork?
+
+This fork extends Stagehand to provide greater control over browser instance configuration, specifically allowing you to:
+- Use custom Chrome/Chromium installations
+- Specify custom user profile directories
+- Maintain persistent browser state across sessions
+
+## Relationship with Upstream Stagehand
+
+This project maintains a close relationship with the upstream Stagehand repository:
+
+- We regularly sync with the upstream repository to incorporate new features and fixes
+- Our changes are focused solely on browser configuration capabilities
+- Version numbers follow upstream with an `-extended` suffix (e.g., `1.12.0-extended.1`)
+
+### Version Compatibility
+
+| Stagehand Version | Stagehand Extended Version |
+|------------------|---------------------------|
+| 1.12.0           | 1.12.0-extended.1        |
+
+### For Contributors
+
+To contribute while maintaining upstream compatibility:
+
+```bash
+# Setup
+git clone https://github.com/your-org/stagehand-extended.git
+git remote add upstream https://github.com/browserbase/stagehand.git
+
+# Stay up-to-date
+git checkout main
+git fetch upstream
+git merge upstream/main
+git checkout extended-main
+git rebase main
+```
+
+## Installation
+
+```bash
+npm install @your-org/stagehand-extended
+# or
+yarn add @your-org/stagehand-extended
+```
+
+### Key Differences from Original Stagehand
+
+```typescript
+// Original Stagehand - Uses default browser paths
+const stagehand = new Stagehand({
+  env: "LOCAL"
+});
+
+// Stagehand Extended - Supports custom browser configuration
+const stagehand = new Stagehand({
+  env: "LOCAL",
+  browserConfig: {
+    // Use a specific Chrome/Chromium installation
+    executablePath: "/custom/path/to/chrome-canary",
+    // Use a specific profile directory to maintain state
+    userDataDir: "/custom/path/to/user-data-dir"
+  }
+});
+```
+
+### Additional Configuration Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `browserConfig.executablePath` | Path to Chrome/Chromium executable | `/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary` |
+| `browserConfig.userDataDir` | Path to browser user data directory | `~/Library/Application Support/Google/Chrome Canary` |
+
+### Use Cases
+
+1. **Custom Browser Installations**: Use specific Chrome/Chromium versions or installations
+2. **Profile Persistence**: Maintain login states, cookies, and browser history
+3. **Cross-Platform Support**: Specify paths appropriate for your operating system
+4. **Development Environments**: Use different profiles for different environments
+
+### Example Configuration
+
+```typescript
+import { Stagehand } from '@your-org/stagehand-extended';
+
+// Using environment-specific paths
+const stagehand = new Stagehand({
+  env: "LOCAL",
+  browserConfig: {
+    executablePath: process.env.CHROME_PATH,
+    userDataDir: process.env.CHROME_PROFILE_DIR
+  }
+});
+
+// Using OS-specific paths
+const stagehand = new Stagehand({
+  env: "LOCAL",
+  browserConfig: {
+    executablePath: process.platform === 'darwin' 
+      ? '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary'
+      : 'C:\\Users\\YourUser\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe',
+    userDataDir: process.platform === 'darwin'
+      ? '~/Library/Application Support/Google/Chrome Canary'
+      : 'C:\\Users\\YourUser\\AppData\\Local\\Google\\Chrome\\User Data'
+  }
+});
+```
+
 <div id="toc" align="center">
   <ul style="list-style: none">
     <a href="https://stagehand.dev">
