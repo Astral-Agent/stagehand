@@ -51,6 +51,8 @@ async function getBrowser(
   browserbaseSessionCreateParams?: Browserbase.Sessions.SessionCreateParams,
   browserbaseSessionID?: string,
   browserConfig?: ConstructorParams["browserConfig"],
+  verbose: number = 0,
+  debugDom: boolean = false,
 ): Promise<BrowserResult> {
   if (env === "BROWSERBASE") {
     if (!apiKey) {
@@ -62,7 +64,7 @@ async function getBrowser(
       });
       env = "LOCAL";
     }
-    if (!projectId) {
+    if (!projectId && verbose > 0) {
       logger({
         category: "init",
         message:
@@ -199,17 +201,19 @@ async function getBrowser(
 
     return { browser, context, debugUrl, sessionUrl, sessionId, env };
   } else {
-    logger({
-      category: "init",
-      message: "launching local browser",
-      level: 0,
-      auxiliary: {
-        headless: {
-          value: headless.toString(),
-          type: "boolean",
+    if (verbose > 0) {
+      logger({
+        category: "init",
+        message: "launching local browser",
+        level: 1,
+        auxiliary: {
+          headless: {
+            value: headless.toString(),
+            type: "boolean",
+          },
         },
-      },
-    });
+      });
+    }
 
     const tmpDirPath = path.join(os.tmpdir(), "stagehand");
     if (!fs.existsSync(tmpDirPath)) {
@@ -278,10 +282,13 @@ async function getBrowser(
       },
     );
 
-    logger({
-      category: "init",
-      message: "local browser started successfully.",
-    });
+    if (verbose > 0) {
+      logger({
+        category: "init",
+        message: "local browser started successfully.",
+        level: 1,
+      });
+    }
 
     await applyStealthScripts(context);
 
@@ -382,12 +389,18 @@ export class Stagehand {
       enableCaching ??
       (process.env.ENABLE_CACHING && process.env.ENABLE_CACHING === "true");
     this.llmProvider =
-      llmProvider || new LLMProvider(this.logger, this.enableCaching);
+      llmProvider || new LLMProvider(this.logger, this.enableCaching, this);
     this.intEnv = env;
     this.apiKey = apiKey ?? process.env.BROWSERBASE_API_KEY;
     this.projectId = projectId ?? process.env.BROWSERBASE_PROJECT_ID;
     this.verbose = verbose ?? 0;
     this.debugDom = debugDom ?? false;
+    this.domSettleTimeoutMs = domSettleTimeoutMs ?? 30_000;
+    this.headless = headless ?? false;
+    this.browserbaseSessionCreateParams = browserbaseSessionCreateParams;
+    this.browserbaseSessionID = browserbaseSessionID;
+    this.userProvidedInstructions = systemPrompt;
+    this.browserConfig = browserConfig;
 
     // Ensure llmClient is always defined
     if (llmClient) {
@@ -440,13 +453,6 @@ export class Stagehand {
         })();
       }
     }
-
-    this.domSettleTimeoutMs = domSettleTimeoutMs ?? 30_000;
-    this.headless = headless ?? false;
-    this.browserbaseSessionCreateParams = browserbaseSessionCreateParams;
-    this.browserbaseSessionID = browserbaseSessionID;
-    this.userProvidedInstructions = systemPrompt;
-    this.browserConfig = browserConfig;
   }
 
   public get logger(): (logLine: LogLine) => void {
@@ -501,6 +507,7 @@ export class Stagehand {
         this.browserbaseSessionCreateParams,
         this.browserbaseSessionID,
         this.browserConfig,
+        this.verbose,
       );
     this.intEnv = env;
     this.contextPath = contextPath;

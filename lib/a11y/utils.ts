@@ -278,29 +278,35 @@ export async function getAccessibilityTree(
       logger,
     );
 
-    logger({
-      category: "observation",
-      message: `got accessibility tree in ${Date.now() - startTime}ms`,
-      level: 1,
-    });
+    // Only log if verbose > 0
+    if ((page as any).stagehand?.verbose > 0) {
+      logger({
+        category: "observation",
+        message: `got accessibility tree in ${Date.now() - startTime}ms`,
+        level: 1,
+      });
+    }
 
     return hierarchicalTree;
   } catch (error) {
-    logger({
-      category: "observation",
-      message: "Error getting accessibility tree",
-      level: 1,
-      auxiliary: {
-        error: {
-          value: error.message,
-          type: "string",
+    // Only log error if verbose > 0
+    if ((page as any).stagehand?.verbose > 0) {
+      logger({
+        category: "observation",
+        message: "Error getting accessibility tree",
+        level: 1,
+        auxiliary: {
+          error: {
+            value: error.message,
+            type: "string",
+          },
+          trace: {
+            value: error.stack,
+            type: "string",
+          },
         },
-        trace: {
-          value: error.stack,
-          type: "string",
-        },
-      },
-    });
+      });
+    }
     throw error;
   } finally {
     await page.disableCDP("Accessibility");
@@ -386,7 +392,7 @@ export async function getXPathByResolvedObjectId(
  *     - During each iteration, we call `Runtime.evaluate` to run `document.evaluate(...)`
  *       with each XPath, obtaining a `RemoteObject` reference if it exists.
  *     - Then, for each valid object reference, we call `DOM.describeNode` to retrieve
- *       the element’s `backendNodeId`.
+ *       the element's `backendNodeId`.
  * - Collects all resulting `backendNodeId`s in a Set and returns them.
  *
  * @param stagehandPage - A StagehandPage instance with built-in CDP helpers.

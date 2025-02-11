@@ -9,6 +9,9 @@ This fork extends Stagehand to provide greater control over browser instance con
 - Specify custom user profile directories
 - Maintain persistent browser state across sessions
 
+Other changes:
+- Improvements to the logging system (previously, logging was verbose despite adjusting `verbosity` and `debugDom` arguments)
+
 ## Relationship with Upstream Stagehand
 
 This project maintains a close relationship with the upstream Stagehand repository:

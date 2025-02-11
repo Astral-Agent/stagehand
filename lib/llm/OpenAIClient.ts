@@ -28,18 +28,21 @@ export class OpenAIClient extends LLMClient {
   private cache: LLMCache | undefined;
   private enableCaching: boolean;
   public clientOptions: ClientOptions;
+  private stagehand: any;
 
   constructor({
     enableCaching = false,
     cache,
     modelName,
     clientOptions,
+    stagehand,
   }: {
     logger: (message: LogLine) => void;
     enableCaching?: boolean;
     cache?: LLMCache;
     modelName: AvailableModel;
     clientOptions?: ClientOptions;
+    stagehand: any;
   }) {
     super(modelName);
     this.clientOptions = clientOptions;
@@ -47,6 +50,7 @@ export class OpenAIClient extends LLMClient {
     this.cache = cache;
     this.enableCaching = enableCaching;
     this.modelName = modelName;
+    this.stagehand = stagehand;
   }
 
   async createChatCompletion<T = LLMResponse>({
@@ -118,24 +122,26 @@ export class OpenAIClient extends LLMClient {
 
     const { image, requestId, ...optionsWithoutImageAndRequestId } = options;
 
-    logger({
-      category: "openai",
-      message: "creating chat completion",
-      level: 1,
-      auxiliary: {
-        options: {
-          value: JSON.stringify({
-            ...optionsWithoutImageAndRequestId,
-            requestId,
-          }),
-          type: "object",
+    if (this.stagehand.verbose > 0 && this.stagehand.debugDom) {
+      logger({
+        category: "openai",
+        message: "creating chat completion",
+        level: 1,
+        auxiliary: {
+          options: {
+            value: JSON.stringify({
+              ...optionsWithoutImageAndRequestId,
+              requestId,
+            }),
+            type: "object",
+          },
+          modelName: {
+            value: this.modelName,
+            type: "string",
+          },
         },
-        modelName: {
-          value: this.modelName,
-          type: "string",
-        },
-      },
-    });
+      });
+    }
 
     const cacheOptions = {
       model: this.modelName,
@@ -252,17 +258,19 @@ export class OpenAIClient extends LLMClient {
     };
     /* eslint-enable */
 
-    logger({
-      category: "openai",
-      message: "creating chat completion",
-      level: 1,
-      auxiliary: {
-        openAiOptions: {
-          value: JSON.stringify(openAiOptions),
-          type: "object",
+    if (this.stagehand.verbose > 0 && this.stagehand.debugDom) {
+      logger({
+        category: "openai",
+        message: "creating chat completion",
+        level: 1,
+        auxiliary: {
+          openAiOptions: {
+            value: JSON.stringify(openAiOptions),
+            type: "object",
+          },
         },
-      },
-    });
+      });
+    }
 
     const formattedMessages: ChatCompletionMessageParam[] =
       options.messages.map((message) => {
@@ -387,21 +395,23 @@ export class OpenAIClient extends LLMClient {
       }
     }
 
-    logger({
-      category: "openai",
-      message: "response",
-      level: 1,
-      auxiliary: {
-        response: {
-          value: JSON.stringify(response),
-          type: "object",
+    if (this.stagehand.verbose > 0) {
+      logger({
+        category: "openai",
+        message: "response",
+        level: 1,
+        auxiliary: {
+          response: {
+            value: JSON.stringify(response),
+            type: "object",
+          },
+          requestId: {
+            value: requestId,
+            type: "string",
+          },
         },
-        requestId: {
-          value: requestId,
-          type: "string",
-        },
-      },
-    });
+      });
+    }
 
     if (options.response_model) {
       const extractedData = response.choices[0].message.content;

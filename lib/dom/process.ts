@@ -90,9 +90,14 @@ export async function processDom(chunksSeen: Array<number>) {
     container,
   );
 
-  console.log(
-    `Stagehand (Browser Process): Extracted dom elements:\n${outputString}`,
-  );
+  // Only log DOM elements if verbose > 0
+  if ((window as any).stagehand?.debugDom > 0) {
+    (window as any).stagehand?.log({
+      category: "dom",
+      message: `Extracted dom elements:\n${outputString}`,
+      level: 2, // Full DOM output only at verbose level 2
+    });
+  }
 
   return {
     outputString,
@@ -103,7 +108,14 @@ export async function processDom(chunksSeen: Array<number>) {
 }
 
 export async function processAllOfDom() {
-  console.log("Stagehand (Browser Process): Processing all of DOM");
+  // Only log processing status if verbose > 0
+  if ((window as any).stagehand?.verbose > 0) {
+    (window as any).stagehand?.log({
+      category: "dom",
+      message: "Processing all of DOM",
+      level: 1,
+    });
+  }
 
   const mainScrollableElements = getScrollableElements(1);
   const mainScrollable = mainScrollableElements[0];
@@ -120,7 +132,15 @@ export async function processAllOfDom() {
   let index = 0;
   const results = [];
   for (let chunk = 0; chunk < totalChunks; chunk++) {
-    // Pass the container to processElements
+    // Only log chunk processing if verbose > 0
+    if ((window as any).stagehand?.verbose > 0) {
+      (window as any).stagehand?.log({
+        category: "dom",
+        message: `Processing DOM chunk ${chunk + 1} of ${totalChunks}`,
+        level: 1,
+      });
+    }
+
     const result = await processElements(chunk, true, index, container);
     results.push(result);
     index += Object.keys(result.selectorMap).length;
@@ -134,9 +154,14 @@ export async function processAllOfDom() {
     {},
   );
 
-  console.log(
-    `Stagehand (Browser Process): All dom elements: ${allOutputString}`,
-  );
+  // Only log full DOM output if verbose > 1
+  if ((window as any).stagehand?.verbose > 1) {
+    (window as any).stagehand?.log({
+      category: "dom",
+      message: `All dom elements: ${allOutputString}`,
+      level: 2,
+    });
+  }
 
   return {
     outputString: allOutputString,
@@ -155,8 +180,6 @@ export async function processElements(
   outputString: string;
   selectorMap: Record<number, string[]>;
 }> {
-  console.time("processElements:total");
-
   // If no container given, default to the entire page
   const stagehandContainer = container ?? createStagehandContainer(window);
 
@@ -168,12 +191,8 @@ export async function processElements(
   const offsetTop = Math.min(chunkHeight, maxScrollTop);
 
   if (scrollToChunk) {
-    console.time("processElements:scroll");
     await stagehandContainer.scrollTo(offsetTop);
-    console.timeEnd("processElements:scroll");
   }
-  console.log("Stagehand (Browser Process): Generating candidate elements");
-  console.time("processElements:findCandidates");
 
   // NOTE: we still gather candidate elems from the entire body
   const DOMQueue: ChildNode[] = [...document.body.childNodes];
@@ -216,17 +235,9 @@ export async function processElements(
     }
   }
 
-  console.timeEnd("processElements:findCandidates");
-
   const selectorMap: Record<number, string[]> = {};
   let outputString = "";
 
-  console.log(
-    `Stagehand (Browser Process): Processing candidate elements: ${candidateElements.length}`,
-  );
-
-  console.time("processElements:processCandidates");
-  console.time("processElements:generateXPaths");
   const xpathLists = await Promise.all(
     candidateElements.map(async (element) => {
       if (xpathCache.has(element)) {
@@ -238,7 +249,6 @@ export async function processElements(
       return xpaths;
     }),
   );
-  console.timeEnd("processElements:generateXPaths");
 
   candidateElements.forEach((element, index) => {
     const xpaths = xpathLists[index];
@@ -263,9 +273,7 @@ export async function processElements(
     outputString += elementOutput;
     selectorMap[index + indexOffset] = xpaths;
   });
-  console.timeEnd("processElements:processCandidates");
 
-  console.timeEnd("processElements:total");
   return {
     outputString,
     selectorMap,

@@ -5,6 +5,10 @@ declare global {
   interface Window {
     chunkNumber: number;
     showChunks?: boolean;
+    stagehand?: {
+      verbose: 0 | 1 | 2;
+      debugDom: boolean;
+    };
     processDom: (chunksSeen: Array<number>) => Promise<{
       outputString: string;
       selectorMap: Record<number, string[]>;

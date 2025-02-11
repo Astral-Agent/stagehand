@@ -15,6 +15,7 @@
     "instructions": "npm run build-dom-scripts && tsx examples/instructions.ts",
     "ai-sdk-client": "npm run build-dom-scripts && tsx examples/ai_sdk_example.ts",
     "actionable_observe_example": "npm run build-dom-scripts && tsx examples/actionable_observe_example.ts",
+    "test-logging": "npm run build-dom-scripts && tsx examples/test_logging.ts",
     "format": "prettier --write .",
     "prettier": "prettier --check .",
     "prettier:fix": "prettier --write .",

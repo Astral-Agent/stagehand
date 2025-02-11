@@ -25,11 +25,17 @@ export class LLMProvider {
   private logger: (message: LogLine) => void;
   private enableCaching: boolean;
   private cache: LLMCache | undefined;
+  private stagehand: any;
 
-  constructor(logger: (message: LogLine) => void, enableCaching: boolean) {
+  constructor(
+    logger: (message: LogLine) => void,
+    enableCaching: boolean,
+    stagehand: any,
+  ) {
     this.logger = logger;
     this.enableCaching = enableCaching;
     this.cache = enableCaching ? new LLMCache(logger) : undefined;
+    this.stagehand = stagehand;
   }
 
   cleanRequestCache(requestId: string): void {
@@ -68,6 +74,7 @@ export class LLMProvider {
           cache: this.cache,
           modelName,
           clientOptions,
+          stagehand: this.stagehand,
         });
       case "anthropic":
         return new AnthropicClient({

@@ -66,29 +66,40 @@ export class StagehandObserveHandler {
     if (!instruction) {
       instruction = `Find elements that can be used for any future actions in the page. These may be navigation links, related pages, section/subsection links, buttons, or other interactive elements. Be comprehensive: if there are multiple elements that may be relevant for future actions, return all of them.`;
     }
-    this.logger({
-      category: "observation",
-      message: "starting observation",
-      level: 1,
-      auxiliary: {
-        instruction: {
-          value: instruction,
-          type: "string",
+
+    // Only log if verbose > 0
+    if (this.stagehand.verbose > 0) {
+      this.logger({
+        category: "observation",
+        message: "starting observation",
+        level: 1,
+        auxiliary: {
+          instruction: {
+            value: instruction,
+            type: "string",
+          },
         },
-      },
-    });
+      });
+    }
 
     let selectorMap: Record<string, string[]> = {};
     let outputString: string;
-    const useAccessibilityTree = !onlyVisible;
+
+    // Only use accessibility tree if debugDom is true and onlyVisible is false
+    const useAccessibilityTree = this.stagehand.debugDom && !onlyVisible;
+
     if (useAccessibilityTree) {
       await this.stagehandPage._waitForSettledDom();
       const tree = await getAccessibilityTree(this.stagehandPage, this.logger);
-      this.logger({
-        category: "observation",
-        message: "Getting accessibility tree data",
-        level: 1,
-      });
+
+      // Only log if verbose > 0
+      if (this.stagehand.verbose > 0) {
+        this.logger({
+          category: "observation",
+          message: "Getting accessibility tree data",
+          level: 1,
+        });
+      }
       outputString = tree.simplified;
     } else {
       const evalResult = await this.stagehand.page.evaluate(() => {
@@ -115,17 +126,19 @@ export class StagehandObserveHandler {
 
         if (useAccessibilityTree) {
           // Generate xpath for the given element if not found in selectorMap
-          this.logger({
-            category: "observation",
-            message: "Getting xpath for element",
-            level: 1,
-            auxiliary: {
-              elementId: {
-                value: elementId.toString(),
-                type: "string",
+          if (this.stagehand.verbose > 0) {
+            this.logger({
+              category: "observation",
+              message: "Getting xpath for element",
+              level: 1,
+              auxiliary: {
+                elementId: {
+                  value: elementId.toString(),
+                  type: "string",
+                },
               },
-            },
-          });
+            });
+          }
 
           const args = { backendNodeId: elementId };
           const { object } = await this.stagehandPage.sendCDP<{
@@ -133,11 +146,13 @@ export class StagehandObserveHandler {
           }>("DOM.resolveNode", args);
 
           if (!object || !object.objectId) {
-            this.logger({
-              category: "observation",
-              message: `Invalid object ID returned for element: ${elementId}`,
-              level: 1,
-            });
+            if (this.stagehand.verbose > 0) {
+              this.logger({
+                category: "observation",
+                message: `Invalid object ID returned for element: ${elementId}`,
+                level: 1,
+              });
+            }
           }
 
           const xpath = await getXPathByResolvedObjectId(
@@ -146,41 +161,42 @@ export class StagehandObserveHandler {
           );
 
           if (!xpath || xpath === "") {
-            this.logger({
-              category: "observation",
-              message: `Empty xpath returned for element: ${elementId}`,
-              level: 1,
-            });
+            if (this.stagehand.verbose > 0) {
+              this.logger({
+                category: "observation",
+                message: `Empty xpath returned for element: ${elementId}`,
+                level: 1,
+              });
+            }
           }
 
           return {
             ...rest,
             selector: `xpath=${xpath}`,
-            // Provisioning or future use if we want to use direct CDP
-            // backendNodeId: elementId,
           };
         }
 
         return {
           ...rest,
           selector: `xpath=${selectorMap[elementId][0]}`,
-          // backendNodeId: backendNodeIdMap[elementId],
         };
       }),
     );
     await this.stagehandPage.cleanupDomDebug();
 
-    this.logger({
-      category: "observation",
-      message: "found elements",
-      level: 1,
-      auxiliary: {
-        elements: {
-          value: JSON.stringify(elementsWithSelectors),
-          type: "object",
+    if (this.stagehand.verbose > 0) {
+      this.logger({
+        category: "observation",
+        message: "found elements",
+        level: 1,
+        auxiliary: {
+          elements: {
+            value: JSON.stringify(elementsWithSelectors),
+            type: "object",
+          },
         },
-      },
-    });
+      });
+    }
 
     await this._recordObservation(instruction, elementsWithSelectors);
     return elementsWithSelectors;
